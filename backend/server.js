@@ -9,6 +9,10 @@ app.use(express.json());
 
 const PORT = process.env.PORT || 3001;
 
+// Add this debug log
+console.log('Setting up routes...');
+
+// Your existing following endpoint
 app.post('/api/following', async (req, res) => {
   try {
     const { handle, password } = req.body;
@@ -57,20 +61,51 @@ app.post('/api/following', async (req, res) => {
   }
 });
 
-app.post('/api/unfollow', async (req, res) => {
-  try {
-    const { handle, password, unfollowHandle } = req.body;
-    const agent = new BskyAgent({ service: 'https://bsky.social' });
-    
-    await agent.login({ identifier: handle, password });
-    await agent.deleteFollow(unfollowHandle);
-    
-    res.json({ success: true });
-  } catch (error) {
-    res.status(500).json({ error: error.message });
-  }
-});
+// Add debug log for unfollow endpoint
+console.log('Adding unfollow endpoint...');
 
-app.listen(PORT, () => {
-  console.log(`Server running on port ${PORT}`);
-});
+app.post('/api/unfollow', async (req, res) => {
+    console.log('Received unfollow request:', req.body);
+    try {
+      const { handle, password, unfollowHandle } = req.body;
+      const agent = new BskyAgent({ service: 'https://bsky.social' });
+      
+      console.log('Attempting login...');
+      await agent.login({ identifier: handle, password });
+      console.log('Login successful');
+      
+      console.log('Getting profile for:', unfollowHandle);
+      const profileToUnfollow = await agent.getProfile({ actor: unfollowHandle });
+      console.log('Found profile, DID:', profileToUnfollow.data.did);
+      
+      // Get current user's follows
+      const { data: { follows } } = await agent.getFollows({
+        actor: agent.session.did,
+        limit: 100
+      });
+      
+      console.log('Looking for follow relationship...');
+      const followRecord = follows.find(f => f.did === profileToUnfollow.data.did);
+      
+      if (!followRecord) {
+        console.log('Follow relationship not found');
+        return res.status(404).json({ error: 'Follow relationship not found' });
+      }
+      
+      console.log('Found follow record:', followRecord.uri);
+      await agent.deleteFollow(followRecord.uri);
+      console.log('Successfully unfollowed');
+      
+      res.json({ success: true });
+    } catch (error) {
+      console.error('Detailed error:', error);
+      res.status(500).json({ 
+        error: error.message,
+        stack: error.stack 
+      });
+    }
+  });
+  
+  app.listen(PORT, () => {
+    console.log(`Server running on port ${PORT}`);
+  });

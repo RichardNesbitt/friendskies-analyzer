@@ -1,5 +1,4 @@
 // frontend/components/bluesky/analyzer.tsx
-
 "use client"
 
 import React, { useState } from 'react';
@@ -22,6 +21,7 @@ export function BlueskyAnalyzer({ className }: BlueskyAnalyzerProps) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [sortConfig, setSortConfig] = useState<{ key: string; direction: 'asc' | 'desc' } | null>(null);
+  const [unfollowedUsers, setUnfollowedUsers] = useState<Set<string>>(new Set())
 
   const fetchFollowing = async () => {
     setLoading(true);
@@ -68,9 +68,12 @@ export function BlueskyAnalyzer({ className }: BlueskyAnalyzerProps) {
         const errorData = await response.json();
         throw new Error(errorData.error || 'Failed to unfollow');
       }
+
+      // Add to unfollowed set
+      setUnfollowedUsers(prev => new Set([...prev, unfollowHandle]))
       
       // Refresh the list
-      await fetchFollowing();
+      // await fetchFollowing();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'An error occurred');
     }
@@ -147,34 +150,31 @@ export function BlueskyAnalyzer({ className }: BlueskyAnalyzerProps) {
               </tr>
             </thead>
             <tbody>
-              {following.map((user) => (
+            {following.map((user) => (
                 <tr key={user.handle} className="border-b">
-                  <td className="p-2">
-                    <a href={`https://bsky.app/profile/${user.handle}`} target="_blank">
-                        {user.handle}
-                    </a>
-                  </td>
-                  <td className="p-2">{user.name}</td>
-                  <td className="p-2">{user.followsBack ? 'Yes' : 'No'}</td>
-                  <td className="p-2">
-                    {user.lastPost === 'No posts' 
-                      ? 'No posts' 
-                      : new Date(user.lastPost).toLocaleString()
-                    }
-                  </td>
-                  {password && (
+                    <td className="p-2">{user.handle}</td>
+                    <td className="p-2">{user.name}</td>
+                    <td className="p-2">{user.followsBack ? 'Yes' : 'No'}</td>
                     <td className="p-2">
-                      <Button
-                        variant="destructive"
+                    {user.lastPost === 'No posts' 
+                        ? 'No posts' 
+                        : new Date(user.lastPost).toLocaleString()
+                    }
+                    </td>
+                    {password && (
+                    <td className="p-2">
+                        <Button
+                        variant={unfollowedUsers.has(user.handle) ? "secondary" : "destructive"}
                         size="sm"
                         onClick={() => handleUnfollow(user.handle)}
-                      >
-                        Unfollow
-                      </Button>
+                        disabled={unfollowedUsers.has(user.handle)}
+                        >
+                        {unfollowedUsers.has(user.handle) ? 'Unfollowed' : 'Unfollow'}
+                        </Button>
                     </td>
-                  )}
+                    )}
                 </tr>
-              ))}
+                ))}
             </tbody>
           </table>
         </div>
